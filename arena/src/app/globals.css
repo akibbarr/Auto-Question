@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Kalpurush";
+  src: url("/fonts/Kalpurush.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body {
+  font-family: "Kalpurush", "Noto Sans Bengali", system-ui, sans-serif;
+}
+
+.select {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(203 213 225);
+  background-color: white;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+.select:focus {
+  border-color: rgb(16 185 129);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.input {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(203 213 225);
+  background-color: white;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.875rem;
+  outline: none;
+  width: 100%;
+}
+.input:focus {
+  border-color: rgb(16 185 129);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.textarea {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(203 213 225);
+  background-color: white;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+  line-height: 1.7;
+}
+.textarea:focus {
+  border-color: rgb(16 185 129);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 0.55rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease, transform 0.05s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background-color: rgb(5 150 105);
+  color: white;
+}
+.btn-primary:hover {
+  background-color: rgb(4 120 87);
+}
+.btn-secondary {
+  background-color: white;
+  border-color: rgb(203 213 225);
+  color: rgb(30 41 59);
+}
+.btn-secondary:hover {
+  background-color: rgb(248 250 252);
+}
+.btn-danger {
+  background-color: rgb(220 38 38);
+  color: white;
+}
+.btn-danger:hover {
+  background-color: rgb(185 28 28);
+}
+.btn-ghost {
+  background-color: transparent;
+  color: rgb(51 65 85);
+}
+.btn-ghost:hover {
+  background-color: rgb(241 245 249);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card {
+  background-color: white;
+  border-radius: 1rem;
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.nav-link {
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgb(51 65 85);
+}
+.nav-link:hover {
+  background-color: rgb(241 245 249);
+}
+.nav-link.active {
+  background-color: rgb(5 150 105);
+  color: white;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

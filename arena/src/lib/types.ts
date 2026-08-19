@@ -107,6 +107,8 @@ export type SectionSelection = {
   questionIds: number[];
   answerCount: number; // "যেকোনো N টি"
   marksEach: number | null; // override marks per question for short section (creative always 10 by default sum)
+  titleOverride?: string | null; // manually edited section heading, e.g. "সংক্ষিপ্ত - উত্তর প্রশ্ন"
+  marksLineOverride?: string | null; // manually edited marks preset, e.g. "১০ × ২ = ২০"
 };
 
 export type ExportPayload = {

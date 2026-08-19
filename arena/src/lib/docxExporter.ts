@@ -20,7 +20,7 @@ import {
 } from "docx";
 import type { ExportPayload, Question } from "./types";
 import { banglaSerial, optionLabel, toBanglaNumber } from "./bangla";
-import { QUESTION_TYPE_LABELS } from "./config";
+import { getSectionText } from "./paperText";
 
 const ALIGN_MAP = {
   left: AlignmentType.LEFT,
@@ -204,22 +204,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
       .filter((q): q is Question => Boolean(q));
     if (sectionQuestions.length === 0) continue;
 
-    const typeLabel = QUESTION_TYPE_LABELS[section.type] ?? section.type;
-    let sectionTitle = "";
-    let marksLine = "";
-
-    if (section.type === "short") {
-      const marksEach = section.marksEach ?? sectionQuestions[0]?.marks ?? 2;
-      sectionTitle = `সংক্ষিপ্ত প্রশ্ন গুলোর উত্তর লিখ: (যেকোনো ${toBanglaNumber(section.answerCount)} টি)`;
-      marksLine = `${toBanglaNumber(section.answerCount)} × ${toBanglaNumber(marksEach)} = ${toBanglaNumber(section.answerCount * marksEach)}`;
-    } else if (section.type === "creative") {
-      sectionTitle = `সৃজনশীল অংশ: (যেকোনো ${toBanglaNumber(section.answerCount)} টি)`;
-      marksLine = `${toBanglaNumber(section.answerCount)} × ১০ = ${toBanglaNumber(section.answerCount * 10)}`;
-    } else {
-      sectionTitle = `বহুনির্বাচনি প্রশ্ন: (${typeLabel})`;
-      const totalMarks = sectionQuestions.reduce((sum, q) => sum + (q.marks || 1), 0);
-      marksLine = `মোট মান = ${toBanglaNumber(totalMarks)}`;
-    }
+    const { title: sectionTitle, marksLine } = getSectionText(section, sectionQuestions);
 
     bodyChildren.push(
       new Paragraph({

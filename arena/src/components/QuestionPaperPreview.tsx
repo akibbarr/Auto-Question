@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Header from "./Header";
 import { apiSend } from "@/lib/api";
 import { banglaSerial, optionLabel, toBanglaNumber } from "@/lib/bangla";
-import { QUESTION_TYPE_LABELS } from "@/lib/config";
+import { getSectionText } from "@/lib/paperText";
 import type { PaperCustomization, PaperHeaderData, Question, SectionSelection } from "@/lib/types";
 
 const PAPER_WIDTH_PX: Record<PaperCustomization["paperSize"], number> = {
@@ -20,12 +20,15 @@ export default function QuestionPaperPreview({
   sections,
   questionMap,
   onQuestionUpdated,
+  onSectionTextChange,
 }: {
   header: PaperHeaderData;
   customization: PaperCustomization;
   sections: SectionSelection[];
   questionMap: Map<number, Question>;
   onQuestionUpdated: (q: Question) => void;
+  /** Called when the user edits a section's heading or "১০ × ২ = ২০" style marks preset inline. */
+  onSectionTextChange?: (type: SectionSelection["type"], patch: { titleOverride?: string; marksLineOverride?: string }) => void;
 }) {
   const alignClass =
     customization.textAlign === "left"
@@ -71,25 +74,23 @@ export default function QuestionPaperPreview({
               .filter((q): q is Question => Boolean(q));
             if (sectionQuestions.length === 0) return null;
 
-            let title = "";
-            let marksLine = "";
-            if (section.type === "short") {
-              const marksEach = section.marksEach ?? sectionQuestions[0]?.marks ?? 2;
-              title = `সংক্ষিপ্ত প্রশ্ন গুলোর উত্তর লিখ: (যেকোনো ${toBanglaNumber(section.answerCount)} টি)`;
-              marksLine = `${toBanglaNumber(section.answerCount)} × ${toBanglaNumber(marksEach)} = ${toBanglaNumber(section.answerCount * marksEach)}`;
-            } else if (section.type === "creative") {
-              title = `সৃজনশীল অংশ: (যেকোনো ${toBanglaNumber(section.answerCount)} টি)`;
-              marksLine = `${toBanglaNumber(section.answerCount)} × ১০ = ${toBanglaNumber(section.answerCount * 10)}`;
-            } else {
-              const total = sectionQuestions.reduce((s, q) => s + (q.marks || 1), 0);
-              title = `বহুনির্বাচনি প্রশ্ন`;
-              marksLine = `মোট মান = ${toBanglaNumber(total)}`;
-            }
+            const { title, marksLine } = getSectionText(section, sectionQuestions);
 
             return (
               <div key={section.type} className="mb-4 break-inside-avoid-column">
                 <p className="mb-2 font-bold underline decoration-2 underline-offset-2">
-                  {title} <span className="ml-3 no-underline">{marksLine}</span>
+                  <Editable
+                    editable={customization.editingMode}
+                    value={title}
+                    onSave={(v) => onSectionTextChange?.(section.type, { titleOverride: v })}
+                  />{" "}
+                  <span className="ml-3 no-underline">
+                    <Editable
+                      editable={customization.editingMode}
+                      value={marksLine}
+                      onSave={(v) => onSectionTextChange?.(section.type, { marksLineOverride: v })}
+                    />
+                  </span>
                 </p>
 
                 {sectionQuestions.map((q, index) => (

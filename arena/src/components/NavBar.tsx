@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "ড্যাশবোর্ড" },
   { href: "/manage", label: "ক্লাস/বিষয়/অধ্যায়" },
   { href: "/questions", label: "প্রশ্ন যোগ ও তালিকা" },
+  { href: "/bank", label: "প্রশ্নব্যাংক (সব প্রশ্ন)" },
   { href: "/paper", label: "প্রশ্নপত্র তৈরি" },
   { href: "/settings", label: "স্কুল সেটিংস" },
 ];

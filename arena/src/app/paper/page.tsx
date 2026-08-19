@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiGet } from "@/lib/api";
 import { exportQuestionPaperDocx } from "@/lib/docxExportClient";
+import { exportQuestionPaperPdf } from "@/lib/pdfExportClient";
 import CascadeSelector, { type CascadeValue } from "@/components/CascadeSelector";
 import SettingsPanel from "@/components/SettingsPanel";
 import QuestionPaperPreview from "@/components/QuestionPaperPreview";
 import { DEFAULT_CUSTOMIZATION, DEFAULT_HEADER, QUESTION_TYPE_LABELS } from "@/lib/config";
 import { banglaSerial } from "@/lib/bangla";
+import { getSectionText } from "@/lib/paperText";
 import type {
   ChapterItem,
   ClassItem,
@@ -32,6 +34,8 @@ export default function PaperPage() {
   const [selectedByType, setSelectedByType] = useState<Record<QuestionType, number[]>>({ mcq: [], short: [], creative: [] });
   const [answerCounts, setAnswerCounts] = useState<Record<QuestionType, number>>({ mcq: 0, short: 0, creative: 0 });
   const [marksEach, setMarksEach] = useState<Record<QuestionType, number | null>>({ mcq: null, short: null, creative: null });
+  const [titleOverride, setTitleOverride] = useState<Record<QuestionType, string | null>>({ mcq: null, short: null, creative: null });
+  const [marksLineOverride, setMarksLineOverride] = useState<Record<QuestionType, string | null>>({ mcq: null, short: null, creative: null });
 
   const [customization, setCustomization] = useState<PaperCustomization>(DEFAULT_CUSTOMIZATION);
   const [header, setHeader] = useState<PaperHeaderData>(DEFAULT_HEADER);
@@ -153,10 +157,19 @@ export default function PaperPage() {
         questionIds: selectedByType[t],
         answerCount: answerCounts[t] || selectedByType[t].length,
         marksEach: marksEach[t],
+        titleOverride: titleOverride[t],
+        marksLineOverride: marksLineOverride[t],
       }));
-  }, [selectedByType, answerCounts, marksEach]);
+  }, [selectedByType, answerCounts, marksEach, titleOverride, marksLineOverride]);
+
+  function handleSectionTextChange(type: QuestionType, patch: { titleOverride?: string; marksLineOverride?: string }) {
+    if (patch.titleOverride !== undefined) setTitleOverride((s) => ({ ...s, [type]: patch.titleOverride || null }));
+    if (patch.marksLineOverride !== undefined) setMarksLineOverride((s) => ({ ...s, [type]: patch.marksLineOverride || null }));
+  }
 
   const totalSelected = sections.reduce((s, sec) => s + sec.questionIds.length, 0);
+
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   async function handleExport() {
     if (totalSelected === 0) return;
@@ -168,6 +181,19 @@ export default function PaperPage() {
       alert((e as Error).message);
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleExportPdf() {
+    if (totalSelected === 0) return;
+    setExportingPdf(true);
+    try {
+      const questions = sections.flatMap((s) => s.questionIds.map((id) => questionMap.get(id)!).filter(Boolean));
+      await exportQuestionPaperPdf({ header, customization, sections, questions }, `${header.subjectName || "প্রশ্নপত্র"}.pdf`);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setExportingPdf(false);
     }
   }
 
@@ -233,6 +259,36 @@ export default function PaperPage() {
                   </label>
                 )}
 
+                {selectedByType[type].length > 0 && (() => {
+                  const secQuestions = selectedByType[type].map((id) => questionMap.get(id)).filter((q): q is Question => Boolean(q));
+                  const auto = getSectionText(
+                    { type, answerCount: answerCounts[type] || selectedByType[type].length, marksEach: marksEach[type] },
+                    secQuestions,
+                  );
+                  return (
+                    <div className="mb-2 space-y-1">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        হেডিং (এডিট করা যাবে)
+                        <input
+                          className="input mt-1 w-full text-xs"
+                          value={titleOverride[type] ?? ""}
+                          placeholder={auto.title}
+                          onChange={(e) => setTitleOverride((s) => ({ ...s, [type]: e.target.value || null }))}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-slate-600">
+                        মান প্রেসেট, যেমন: ১০ × ২ = ২০ (এডিট করা যাবে)
+                        <input
+                          className="input mt-1 w-full text-xs"
+                          value={marksLineOverride[type] ?? ""}
+                          placeholder={auto.marksLine}
+                          onChange={(e) => setMarksLineOverride((s) => ({ ...s, [type]: e.target.value || null }))}
+                        />
+                      </label>
+                    </div>
+                  );
+                })()}
+
                 <div className="max-h-72 space-y-1 overflow-y-auto">
                   {grouped[type].length === 0 && <p className="text-xs text-slate-400">কোনো প্রশ্ন নেই</p>}
                   {grouped[type].map((q) => (
@@ -260,9 +316,14 @@ export default function PaperPage() {
 
             <div className="card p-4">
               <p className="mb-2 text-sm font-semibold text-slate-700">মোট নির্বাচিত: {banglaSerial(totalSelected, 1)}টি</p>
-              <button className="btn btn-primary w-full" onClick={handleExport} disabled={exporting || totalSelected === 0}>
-                {exporting ? "তৈরি হচ্ছে..." : "📥 .docx ডাউনলোড করুন"}
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="btn btn-primary" onClick={handleExport} disabled={exporting || totalSelected === 0}>
+                  {exporting ? "তৈরি হচ্ছে..." : "📥 .docx"}
+                </button>
+                <button className="btn btn-primary" onClick={handleExportPdf} disabled={exportingPdf || totalSelected === 0}>
+                  {exportingPdf ? "তৈরি হচ্ছে..." : "📄 .pdf"}
+                </button>
+              </div>
             </div>
 
             <SettingsPanel
@@ -280,6 +341,7 @@ export default function PaperPage() {
               sections={sections}
               questionMap={questionMap}
               onQuestionUpdated={(q) => setQuestionMap((prev) => new Map(prev).set(q.id, q))}
+              onSectionTextChange={handleSectionTextChange}
             />
           </div>
         </div>

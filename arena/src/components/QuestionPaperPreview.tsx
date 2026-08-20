@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Header from "./Header";
 import Editable from "./Editable";
+import FloatingFormatToolbar from "./FloatingFormatToolbar";
 import { apiSend } from "@/lib/api";
 import { banglaSerial, fromBanglaDigits, optionLabel, toBanglaNumber } from "@/lib/bangla";
 import { getSectionText } from "@/lib/paperText";
@@ -65,6 +66,7 @@ export default function QuestionPaperPreview({
       className="print-area relative mx-auto overflow-hidden rounded-xl border border-slate-300 bg-white p-8 shadow-inner"
       style={{ maxWidth: PAPER_WIDTH_PX[customization.paperSize] }}
     >
+      {customization.editingMode && <FloatingFormatToolbar />}
       {header.fields.watermark && header.watermarkText && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
           <span className="rotate-[-30deg] text-6xl font-black text-slate-200 opacity-40">{header.watermarkText}</span>

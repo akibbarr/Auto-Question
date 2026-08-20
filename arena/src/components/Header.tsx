@@ -67,7 +67,7 @@ export default function Header({
       </div>
 
       <HeaderRow
-        left={
+        center={
           header.fields.examName && (header.examName || editable) ? (
             <Editable editable={editable} value={header.examName} placeholder="পরীক্ষার নাম" onSave={(v) => set({ examName: v })} />
           ) : null

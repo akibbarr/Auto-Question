@@ -9,6 +9,7 @@ import QuestionPaperPreview from "@/components/QuestionPaperPreview";
 import { DEFAULT_CUSTOMIZATION, DEFAULT_HEADER, QUESTION_TYPE_LABELS } from "@/lib/config";
 import { banglaSerial, fromBanglaDigits, toBanglaNumber } from "@/lib/bangla";
 import { getSectionText } from "@/lib/paperText";
+import { htmlToPlainText } from "@/lib/htmlRuns";
 import type {
   ChapterItem,
   ClassItem,
@@ -160,7 +161,7 @@ export default function PaperPage() {
   const duplicateTextSet = useMemo(() => {
     const counts = new Map<string, number>();
     availableQuestions.forEach((q) => {
-      const norm = q.text.trim().replace(/\s+/g, " ").toLowerCase();
+      const norm = htmlToPlainText(q.text).toLowerCase();
       counts.set(norm, (counts.get(norm) ?? 0) + 1);
     });
     const dupes = new Set<string>();
@@ -171,7 +172,7 @@ export default function PaperPage() {
   }, [availableQuestions]);
 
   function isDuplicate(q: Question) {
-    const norm = q.text.trim().replace(/\s+/g, " ").toLowerCase();
+    const norm = htmlToPlainText(q.text).toLowerCase();
     return duplicateTextSet.has(norm);
   }
 
@@ -373,7 +374,7 @@ export default function PaperPage() {
                       />
                       <span className="line-clamp-3">
                         {isDuplicate(q) && <span className="mr-1 rounded bg-red-100 px-1 text-red-700">⚠ পুনরাবৃত্ত</span>}
-                        {q.text || "(উদ্দীপক খালি)"}
+                        {htmlToPlainText(q.text) || "(উদ্দীপক খালি)"}
                       </span>
                     </label>
                   ))}

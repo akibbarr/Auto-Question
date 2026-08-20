@@ -4,6 +4,7 @@ import { useState } from "react";
 import { apiSend } from "@/lib/api";
 import type { Question } from "@/lib/types";
 import { QUESTION_TYPE_LABELS } from "@/lib/config";
+import { stripHtml } from "@/lib/richText";
 
 export default function QuestionList({
   questions,
@@ -71,7 +72,7 @@ function QuestionCard({ question, onChanged }: { question: Question; onChanged: 
 
       {!editing && (
         <div className="space-y-2 text-sm text-slate-800">
-          <p className="whitespace-pre-wrap">{question.text}</p>
+          <p className="whitespace-pre-wrap">{stripHtml(question.text)}</p>
           {question.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={question.imageUrl} alt="question" className="h-24 rounded border" />
@@ -80,7 +81,7 @@ function QuestionCard({ question, onChanged }: { question: Question; onChanged: 
             <ul className="ml-4 list-disc space-y-0.5">
               {question.options.map((o, i) => (
                 <li key={i} className={o === question.correctAnswer ? "font-bold text-emerald-700" : ""}>
-                  {o}
+                  {stripHtml(o)}
                 </li>
               ))}
             </ul>
@@ -89,7 +90,7 @@ function QuestionCard({ question, onChanged }: { question: Question; onChanged: 
             <ul className="ml-4 space-y-0.5">
               {question.subQuestions.map((s, i) => (
                 <li key={i}>
-                  <span className="font-semibold">{s.label}.</span> {s.text}{" "}
+                  <span className="font-semibold">{s.label}.</span> {stripHtml(s.text)}{" "}
                   <span className="text-slate-500">({s.marks})</span>
                 </li>
               ))}

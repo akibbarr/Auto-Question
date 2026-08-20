@@ -21,6 +21,7 @@ import {
 import type { ExportPayload, Question } from "./types";
 import { banglaSerial, optionLabel, toBanglaNumber } from "./bangla";
 import { getSectionText } from "./paperText";
+import { htmlToRuns } from "./htmlRuns";
 
 const ALIGN_MAP = {
   left: AlignmentType.LEFT,
@@ -103,6 +104,24 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
 
   const baseRun = { font: fontFamily, size: fontSizeHalfPoints };
 
+  /** Converts a (possibly rich-text) field into TextRuns, applying `extra` as
+   * the default style — detected <b>/<i>/<u>/font-size tags layer on top. */
+  function runsFor(html: string, extra: { bold?: boolean; italics?: boolean; underline?: boolean; size?: number } = {}): TextRun[] {
+    const parsed = htmlToRuns(html);
+    if (parsed.length === 0) return [];
+    return parsed.map(
+      (r) =>
+        new TextRun({
+          font: fontFamily,
+          size: r.sizeHalfPt ?? extra.size ?? fontSizeHalfPoints,
+          bold: extra.bold || r.bold || undefined,
+          italics: extra.italics || r.italics || undefined,
+          underline: extra.underline || r.underline ? {} : undefined,
+          text: r.text,
+        }),
+    );
+  }
+
   /** Mirrors the on-screen HeaderRow: left-aligned / truly centered / right-aligned
    * text on one line, using two tab stops (like real exam papers made in Word). */
   function threeSlotParagraph(left: string, center: string, right: string, bold = true) {
@@ -114,9 +133,11 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
       ],
       spacing: { before: 60, after: 60 },
       children: [
-        new TextRun({ ...baseRun, text: left, bold }),
-        new TextRun({ ...baseRun, text: `\t${center}`, bold }),
-        new TextRun({ ...baseRun, text: `\t${right}` }),
+        ...runsFor(left, { bold }),
+        new TextRun({ ...baseRun, text: "\t" }),
+        ...runsFor(center, { bold }),
+        new TextRun({ ...baseRun, text: "\t" }),
+        ...runsFor(right, {}),
       ],
     });
   }
@@ -127,7 +148,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     headerChildren.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ ...baseRun, text: header.schoolName, bold: true, size: fontSizeHalfPoints + 8 })],
+        children: runsFor(header.schoolName, { bold: true, size: fontSizeHalfPoints + 8 }),
       }),
     );
   }
@@ -135,14 +156,14 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     headerChildren.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ ...baseRun, text: header.address, size: fontSizeHalfPoints - 2 })],
+        children: runsFor(header.address, { size: fontSizeHalfPoints - 2 }),
       }),
     );
   }
 
   const examLine = threeSlotParagraph(
-    header.fields.examName && header.examName ? header.examName : "",
     "",
+    header.fields.examName && header.examName ? header.examName : "",
     header.fields.setCode && header.setCode ? `সেট কোড: ${header.setCode}` : "",
   );
   if (examLine) headerChildren.push(examLine);
@@ -158,7 +179,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     headerChildren.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ ...baseRun, text: header.subjectName, bold: true, size: fontSizeHalfPoints + 4 })],
+        children: runsFor(header.subjectName, { bold: true, size: fontSizeHalfPoints + 4 }),
       }),
     );
   }
@@ -167,7 +188,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     headerChildren.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ ...baseRun, text: header.chapterName, italics: true })],
+        children: runsFor(header.chapterName, { italics: true }),
       }),
     );
   }
@@ -188,7 +209,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
           bottom: { style: BorderStyle.SINGLE, size: 4, color: "999999" },
         },
         spacing: { before: 60, after: 120 },
-        children: [new TextRun({ ...baseRun, text: header.instructions, italics: true, size: fontSizeHalfPoints - 2 })],
+        children: runsFor(header.instructions, { italics: true, size: fontSizeHalfPoints - 2 }),
       }),
     );
   }
@@ -208,8 +229,9 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
         spacing: { before: 240, after: 80 },
         tabStops: [{ type: "right", position: rightTab }],
         children: [
-          new TextRun({ ...baseRun, text: sectionTitle, bold: true, underline: {} }),
-          new TextRun({ ...baseRun, text: `\t${marksLine}`, bold: true }),
+          ...runsFor(sectionTitle, { bold: true, underline: true }),
+          new TextRun({ ...baseRun, text: "\t" }),
+          ...runsFor(marksLine, { bold: true }),
         ],
       }),
     );
@@ -222,10 +244,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
           new Paragraph({
             alignment: align,
             spacing: { after: customization.questionGap },
-            children: [
-              new TextRun({ ...baseRun, text: `${serial}. `, bold: true }),
-              new TextRun({ ...baseRun, text: q.text }),
-            ],
+            children: [new TextRun({ ...baseRun, text: `${serial}. `, bold: true }), ...runsFor(q.text)],
           }),
         );
         const img = buildImageRun(q.imageUrl);
@@ -239,7 +258,8 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
               spacing: { after: 60 },
               tabStops: [{ type: "right", position: rightTab }],
               children: [
-                new TextRun({ ...baseRun, text: `${sub.label}. ${sub.text}` }),
+                new TextRun({ ...baseRun, text: `${sub.label}. ` }),
+                ...runsFor(sub.text),
                 new TextRun({ ...baseRun, text: `\t${toBanglaNumber(sub.marks)}` }),
               ],
             }),
@@ -252,7 +272,8 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
             spacing: { after: 40 },
             tabStops: [{ type: "right", position: rightTab }],
             children: [
-              new TextRun({ ...baseRun, text: `${serial}. ${q.text}` }),
+              new TextRun({ ...baseRun, text: `${serial}. ` }),
+              ...runsFor(q.text),
               new TextRun({ ...baseRun, text: `\t${toBanglaNumber(q.marks)}` }),
             ],
           }),
@@ -265,7 +286,10 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
               alignment: align,
               indent: { left: 360 },
               spacing: { after: customization.questionGap },
-              children: [new TextRun({ ...baseRun, text: `${optionLabel(optIndex, customization.optionStyle)} ${opt}` })],
+              children: [
+                new TextRun({ ...baseRun, text: `${optionLabel(optIndex, customization.optionStyle)} ` }),
+                ...runsFor(opt),
+              ],
             }),
           );
         });
@@ -276,7 +300,8 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
             spacing: { after: customization.questionGap },
             tabStops: [{ type: "right", position: rightTab }],
             children: [
-              new TextRun({ ...baseRun, text: `${serial}. ${q.text}` }),
+              new TextRun({ ...baseRun, text: `${serial}. ` }),
+              ...runsFor(q.text),
               new TextRun({ ...baseRun, text: `\t${toBanglaNumber(q.marks)}` }),
             ],
           }),
@@ -292,7 +317,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { before: 240 },
-        children: [new TextRun({ ...baseRun, text: header.footerText, italics: true, size: fontSizeHalfPoints - 2 })],
+        children: runsFor(header.footerText, { italics: true, size: fontSizeHalfPoints - 2 }),
       }),
     );
   }

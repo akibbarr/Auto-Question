@@ -109,12 +109,13 @@ export default function CreativeQuestionParser({
     <div className="space-y-4">
       <div>
         <label className="mb-1 block text-sm font-semibold text-slate-700">
-          একাধিক সৃজনশীল প্রশ্ন একসাথে পেস্ট করুন ("প্রশ্ন ০১:", "প্রশ্ন ০২:" দিয়ে আলাদা করুন)
+          একাধিক সৃজনশীল প্রশ্ন একসাথে পেস্ট করুন — শুধু পরপর পেস্ট করুন, ক/খ/গ/ঘ দেখে প্রশ্ন আলাদা করে নেওয়া হবে
+          (চাইলে "প্রশ্ন ০১:", "প্রশ্ন ০২:" দিয়ে আলাদা করেও লিখতে পারেন)
         </label>
         <textarea
           className="textarea"
           rows={8}
-          placeholder={"প্রশ্ন ০১: উদ্দীপক লিখুন...\nক. প্রশ্ন\nখ. প্রশ্ন\nগ. প্রশ্ন\nঘ. প্রশ্ন\n\nপ্রশ্ন ০২: ..."}
+          placeholder={"উদ্দীপক লিখুন...\nক. প্রশ্ন\nখ. প্রশ্ন\nগ. প্রশ্ন\nঘ. প্রশ্ন\n\nপরের উদ্দীপক...\nক. প্রশ্ন\nখ. প্রশ্ন\nগ. প্রশ্ন\nঘ. প্রশ্ন"}
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
         />

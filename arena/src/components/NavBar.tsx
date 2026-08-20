@@ -16,10 +16,13 @@ export default function NavBar() {
   const pathname = usePathname();
 
   return (
-    <header className="no-print sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <header className="no-print sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="text-lg font-extrabold text-emerald-700">
-          📘 প্রশ্নব্যাংক জেনারেটর
+        <Link href="/" className="flex items-center gap-2 text-lg font-extrabold text-slate-900">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-base text-white shadow-md">
+            📘
+          </span>
+          <span className="bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent">প্রশ্নব্যাংক জেনারেটর</span>
         </Link>
         <nav className="flex flex-wrap gap-1">
           {LINKS.map((link) => (

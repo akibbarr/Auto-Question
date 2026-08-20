@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiGet } from "@/lib/api";
 import { exportQuestionPaperDocx } from "@/lib/docxExportClient";
-import { exportQuestionPaperPdf } from "@/lib/pdfExportClient";
 import CascadeSelector, { type CascadeValue } from "@/components/CascadeSelector";
 import SettingsPanel from "@/components/SettingsPanel";
 import QuestionPaperPreview from "@/components/QuestionPaperPreview";
 import { DEFAULT_CUSTOMIZATION, DEFAULT_HEADER, QUESTION_TYPE_LABELS } from "@/lib/config";
-import { banglaSerial } from "@/lib/bangla";
+import { banglaSerial, fromBanglaDigits, toBanglaNumber } from "@/lib/bangla";
 import { getSectionText } from "@/lib/paperText";
 import type {
   ChapterItem,
@@ -42,6 +41,55 @@ export default function PaperPage() {
   const [questionMap, setQuestionMap] = useState<Map<number, Question>>(new Map());
   const [exporting, setExporting] = useState(false);
   const [setLetterIndex, setSetLetterIndex] = useState(0);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const DRAFT_KEY = "qp_paper_draft_v1";
+
+  // Restore an in-progress paper once on first load, so an accidental refresh
+  // doesn't lose your selections, marks presets, or header edits.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.cascade) setCascade(d.cascade);
+        if (d.chapterIds) setChapterIds(d.chapterIds);
+        if (d.selectedByType) setSelectedByType(d.selectedByType);
+        if (d.answerCounts) setAnswerCounts(d.answerCounts);
+        if (d.marksEach) setMarksEach(d.marksEach);
+        if (d.titleOverride) setTitleOverride(d.titleOverride);
+        if (d.marksLineOverride) setMarksLineOverride(d.marksLineOverride);
+        if (d.customization) setCustomization(d.customization);
+        if (d.header) setHeader((h) => ({ ...h, ...d.header }));
+      }
+    } catch {
+      // ignore corrupt/unavailable storage
+    } finally {
+      setDraftRestored(true);
+    }
+  }, []);
+
+  // Autosave the working draft (debounced by React's own batching) whenever
+  // anything relevant changes, but only after the initial restore above.
+  useEffect(() => {
+    if (!draftRestored) return;
+    const draft = {
+      cascade,
+      chapterIds,
+      selectedByType,
+      answerCounts,
+      marksEach,
+      titleOverride,
+      marksLineOverride,
+      customization,
+      header,
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // storage full or unavailable — silently skip autosave
+    }
+  }, [draftRestored, cascade, chapterIds, selectedByType, answerCounts, marksEach, titleOverride, marksLineOverride, customization, header]);
 
   useEffect(() => {
     apiGet<ClassItem[]>("/api/classes").then(setClasses);
@@ -169,7 +217,22 @@ export default function PaperPage() {
 
   const totalSelected = sections.reduce((s, sec) => s + sec.questionIds.length, 0);
 
-  const [exportingPdf, setExportingPdf] = useState(false);
+  const totalMarks = useMemo(() => {
+    return sections.reduce((sum, sec) => {
+      const secQuestions = sec.questionIds.map((id) => questionMap.get(id)).filter((q): q is Question => Boolean(q));
+      if (sec.type === "short") {
+        const each = sec.marksEach ?? secQuestions[0]?.marks ?? 2;
+        return sum + sec.answerCount * each;
+      }
+      if (sec.type === "creative") {
+        return sum + sec.answerCount * 10;
+      }
+      return sum + secQuestions.reduce((s, q) => s + (q.marks || 1), 0);
+    }, 0);
+  }, [sections, questionMap]);
+
+  const headerFullMarksNum = parseInt(fromBanglaDigits(header.fullMarks || "0"), 10) || 0;
+  const marksMismatch = totalSelected > 0 && headerFullMarksNum !== totalMarks;
 
   async function handleExport() {
     if (totalSelected === 0) return;
@@ -184,17 +247,21 @@ export default function PaperPage() {
     }
   }
 
-  async function handleExportPdf() {
+  function handlePrintPdf() {
     if (totalSelected === 0) return;
-    setExportingPdf(true);
-    try {
-      const questions = sections.flatMap((s) => s.questionIds.map((id) => questionMap.get(id)!).filter(Boolean));
-      await exportQuestionPaperPdf({ header, customization, sections, questions }, `${header.subjectName || "প্রশ্নপত্র"}.pdf`);
-    } catch (e) {
-      alert((e as Error).message);
-    } finally {
-      setExportingPdf(false);
-    }
+    // Uses the browser's own print pipeline (window.print → "Save as PDF"):
+    // no server round-trip, no missing-Chromium failures, and it only ever
+    // prints the pages the content actually needs (see .print-area CSS).
+    window.print();
+  }
+
+  function resetSelections() {
+    if (!confirm("সব নির্বাচিত প্রশ্ন মুছে ফেলতে চান?")) return;
+    setSelectedByType({ mcq: [], short: [], creative: [] });
+    setAnswerCounts({ mcq: 0, short: 0, creative: 0 });
+    setMarksEach({ mcq: null, short: null, creative: null });
+    setTitleOverride({ mcq: null, short: null, creative: null });
+    setMarksLineOverride({ mcq: null, short: null, creative: null });
   }
 
   const grouped = useMemo(() => {
@@ -205,9 +272,9 @@ export default function PaperPage() {
 
   return (
     <main className="space-y-6">
-      <h1 className="text-2xl font-extrabold text-slate-900">প্রশ্নপত্র তৈরি করুন</h1>
+      <h1 className="no-print text-2xl font-extrabold text-slate-900">প্রশ্নপত্র তৈরি করুন</h1>
 
-      <div className="card p-4">
+      <div className="card no-print p-4">
         <CascadeSelector
           value={cascade}
           onChange={setCascade}
@@ -219,12 +286,12 @@ export default function PaperPage() {
       </div>
 
       {chapterIds.length === 0 ? (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="no-print rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
           প্রশ্ন দেখতে ক্লাস, বিষয় ও অন্তত একটি অধ্যায় নির্বাচন করুন।
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-4 lg:col-span-1">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 print:!block">
+          <div className="no-print space-y-4 lg:col-span-1">
             {(["mcq", "short", "creative"] as QuestionType[]).map((type) => (
               <div key={type} className="card p-4">
                 <div className="mb-2 flex items-center justify-between">
@@ -314,16 +381,41 @@ export default function PaperPage() {
               </div>
             ))}
 
-            <div className="card p-4">
-              <p className="mb-2 text-sm font-semibold text-slate-700">মোট নির্বাচিত: {banglaSerial(totalSelected, 1)}টি</p>
+            <div className="card space-y-3 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-700">মোট নির্বাচিত</span>
+                <span className="font-bold text-emerald-700">{banglaSerial(totalSelected, 1)}টি</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-700">সর্বমোট মান (গণনা করা)</span>
+                <span className="font-bold text-emerald-700">{toBanglaNumber(totalMarks)}</span>
+              </div>
+              {marksMismatch && (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                  <span>পূর্ণমানে লেখা আছে {header.fullMarks || "০"}, কিন্তু প্রশ্নের মোট মান {toBanglaNumber(totalMarks)}।</span>
+                  <button
+                    className="btn btn-secondary shrink-0 px-2 py-1 text-xs"
+                    onClick={() => setHeader((h) => ({ ...h, fullMarks: toBanglaNumber(totalMarks) }))}
+                  >
+                    ✓ বসান
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <button className="btn btn-primary" onClick={handleExport} disabled={exporting || totalSelected === 0}>
                   {exporting ? "তৈরি হচ্ছে..." : "📥 .docx"}
                 </button>
-                <button className="btn btn-primary" onClick={handleExportPdf} disabled={exportingPdf || totalSelected === 0}>
-                  {exportingPdf ? "তৈরি হচ্ছে..." : "📄 .pdf"}
+                <button className="btn btn-primary" onClick={handlePrintPdf} disabled={totalSelected === 0}>
+                  🖨️ PDF / প্রিন্ট
                 </button>
               </div>
+              <button className="btn btn-ghost w-full text-xs text-red-600" onClick={resetSelections} disabled={totalSelected === 0}>
+                🔄 সব নির্বাচন রিসেট করুন
+              </button>
+              <p className="text-[11px] leading-snug text-slate-400">
+                PDF-এর জন্য প্রিন্ট ডায়ালগে "Destination"-এ <b>Save as PDF</b> বেছে নিন। প্রশ্ন যতটুকু জায়গা নেয়, ঠিক ততগুলো পেজেই
+                তৈরি হবে — আলাদা কিছু করতে হবে না। আপনার কাজ এই ব্রাউজারে অটোমেটিক সেভ থাকে, রিফ্রেশ করলেও হারাবে না।
+              </p>
             </div>
 
             <SettingsPanel
@@ -334,7 +426,7 @@ export default function PaperPage() {
             />
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 print:!col-span-1">
             <QuestionPaperPreview
               header={header}
               customization={customization}
@@ -342,6 +434,7 @@ export default function PaperPage() {
               questionMap={questionMap}
               onQuestionUpdated={(q) => setQuestionMap((prev) => new Map(prev).set(q.id, q))}
               onSectionTextChange={handleSectionTextChange}
+              onHeaderChange={(patch) => setHeader((h) => ({ ...h, ...patch }))}
             />
           </div>
         </div>

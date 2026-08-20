@@ -97,8 +97,29 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     A5: { width: 8391, height: 11906 },
   };
   const size = paperSizeMap[customization.paperSize] ?? paperSizeMap.A4;
+  const usableWidth = size.width - 1440; // minus 720 twip margins on each side
+  const centerTab = Math.round(usableWidth / 2);
+  const rightTab = usableWidth;
 
   const baseRun = { font: fontFamily, size: fontSizeHalfPoints };
+
+  /** Mirrors the on-screen HeaderRow: left-aligned / truly centered / right-aligned
+   * text on one line, using two tab stops (like real exam papers made in Word). */
+  function threeSlotParagraph(left: string, center: string, right: string, bold = true) {
+    if (!left && !center && !right) return null;
+    return new Paragraph({
+      tabStops: [
+        { type: "center", position: centerTab },
+        { type: "right", position: rightTab },
+      ],
+      spacing: { before: 60, after: 60 },
+      children: [
+        new TextRun({ ...baseRun, text: left, bold }),
+        new TextRun({ ...baseRun, text: `\t${center}`, bold }),
+        new TextRun({ ...baseRun, text: `\t${right}` }),
+      ],
+    });
+  }
 
   const headerChildren: Paragraph[] = [];
 
@@ -119,38 +140,19 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     );
   }
 
-  const midLineLeft: string[] = [];
-  if (header.fields.examName && header.examName) midLineLeft.push(header.examName);
-  const midLineRight: string[] = [];
-  if (header.fields.setCode && header.setCode) midLineRight.push(`সেট কোড: ${header.setCode}`);
+  const examLine = threeSlotParagraph(
+    header.fields.examName && header.examName ? header.examName : "",
+    "",
+    header.fields.setCode && header.setCode ? `সেট কোড: ${header.setCode}` : "",
+  );
+  if (examLine) headerChildren.push(examLine);
 
-  if (midLineLeft.length || midLineRight.length) {
-    headerChildren.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [
-          new TextRun({ ...baseRun, text: midLineLeft.join(" — "), bold: true }),
-          ...(midLineRight.length ? [new TextRun({ ...baseRun, text: `      ${midLineRight.join(" ")}` })] : []),
-        ],
-      }),
-    );
-  }
-
-  const classSubjectLine: string[] = [];
-  if (header.fields.className && header.className) classSubjectLine.push(header.className);
-  if (classSubjectLine.length) {
-    headerChildren.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [
-          new TextRun({ ...baseRun, text: classSubjectLine.join(" — "), bold: true }),
-          ...(header.fields.subjectCode && header.subjectCode
-            ? [new TextRun({ ...baseRun, text: `      বিষয় কোড: ${header.subjectCode}` })]
-            : []),
-        ],
-      }),
-    );
-  }
+  const classLine = threeSlotParagraph(
+    "",
+    header.fields.className && header.className ? header.className : "",
+    header.fields.subjectCode && header.subjectCode ? `বিষয় কোড: ${header.subjectCode}` : "",
+  );
+  if (classLine) headerChildren.push(classLine);
 
   if (header.fields.subjectName && header.subjectName) {
     headerChildren.push(
@@ -170,17 +172,12 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     );
   }
 
-  headerChildren.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 100, after: 100 },
-      children: [
-        new TextRun({ ...baseRun, text: `সময়— ${header.duration}` }),
-        new TextRun({ ...baseRun, text: `                    পূর্ণমান— ${header.fullMarks}` }),
-        ...(header.fields.obtainedMarksBox ? [new TextRun({ ...baseRun, text: `                    প্রাপ্ত নম্বর:` })] : []),
-      ],
-    }),
+  const marksLine2 = threeSlotParagraph(
+    `সময়— ${header.duration}`,
+    header.fields.obtainedMarksBox ? "প্রাপ্ত নম্বর: ______" : "",
+    `পূর্ণমান— ${header.fullMarks}`,
   );
+  if (marksLine2) headerChildren.push(marksLine2);
 
   if (header.fields.instructions && header.instructions) {
     headerChildren.push(
@@ -209,9 +206,10 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
     bodyChildren.push(
       new Paragraph({
         spacing: { before: 240, after: 80 },
+        tabStops: [{ type: "right", position: rightTab }],
         children: [
           new TextRun({ ...baseRun, text: sectionTitle, bold: true, underline: {} }),
-          new TextRun({ ...baseRun, text: `      ${marksLine}`, bold: true }),
+          new TextRun({ ...baseRun, text: `\t${marksLine}`, bold: true }),
         ],
       }),
     );
@@ -239,7 +237,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
               alignment: align,
               indent: { left: 360 },
               spacing: { after: 60 },
-              tabStops: [{ type: "right", position: 9600 }],
+              tabStops: [{ type: "right", position: rightTab }],
               children: [
                 new TextRun({ ...baseRun, text: `${sub.label}. ${sub.text}` }),
                 new TextRun({ ...baseRun, text: `\t${toBanglaNumber(sub.marks)}` }),
@@ -252,7 +250,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
           new Paragraph({
             alignment: align,
             spacing: { after: 40 },
-            tabStops: [{ type: "right", position: 9600 }],
+            tabStops: [{ type: "right", position: rightTab }],
             children: [
               new TextRun({ ...baseRun, text: `${serial}. ${q.text}` }),
               new TextRun({ ...baseRun, text: `\t${toBanglaNumber(q.marks)}` }),
@@ -276,7 +274,7 @@ export async function generateQuestionPaperDocx(payload: ExportPayload): Promise
           new Paragraph({
             alignment: align,
             spacing: { after: customization.questionGap },
-            tabStops: [{ type: "right", position: 9600 }],
+            tabStops: [{ type: "right", position: rightTab }],
             children: [
               new TextRun({ ...baseRun, text: `${serial}. ${q.text}` }),
               new TextRun({ ...baseRun, text: `\t${toBanglaNumber(q.marks)}` }),

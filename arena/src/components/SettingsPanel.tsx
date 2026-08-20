@@ -71,7 +71,10 @@ export default function SettingsPanel({
       <h3 className="font-bold text-slate-800">কাস্টমাইজেশন প্যানেল</h3>
 
       <label className="flex items-center justify-between text-sm font-medium">
-        এডিটিং মোড
+        <span>
+          এডিটিং মোড
+          <span className="block text-xs font-normal text-slate-400">চালু করলে প্রিভিউতে হেডার, শিরোনাম, মান, প্রশ্ন — সবকিছু সরাসরি ক্লিক করে এডিট করা যাবে</span>
+        </span>
         <input
           type="checkbox"
           checked={customization.editingMode}

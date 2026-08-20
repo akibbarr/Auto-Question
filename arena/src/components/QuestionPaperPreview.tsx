@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import Header from "./Header";
+import Editable from "./Editable";
 import { apiSend } from "@/lib/api";
-import { banglaSerial, optionLabel, toBanglaNumber } from "@/lib/bangla";
+import { banglaSerial, fromBanglaDigits, optionLabel, toBanglaNumber } from "@/lib/bangla";
 import { getSectionText } from "@/lib/paperText";
 import type { PaperCustomization, PaperHeaderData, Question, SectionSelection } from "@/lib/types";
 
@@ -21,6 +22,7 @@ export default function QuestionPaperPreview({
   questionMap,
   onQuestionUpdated,
   onSectionTextChange,
+  onHeaderChange,
 }: {
   header: PaperHeaderData;
   customization: PaperCustomization;
@@ -29,6 +31,8 @@ export default function QuestionPaperPreview({
   onQuestionUpdated: (q: Question) => void;
   /** Called when the user edits a section's heading or "১০ × ২ = ২০" style marks preset inline. */
   onSectionTextChange?: (type: SectionSelection["type"], patch: { titleOverride?: string; marksLineOverride?: string }) => void;
+  /** Called when the user edits a header field (school name, exam name, time, etc.) inline. */
+  onHeaderChange?: (patch: Partial<PaperHeaderData>) => void;
 }) {
   const alignClass =
     customization.textAlign === "left"
@@ -57,7 +61,10 @@ export default function QuestionPaperPreview({
   }
 
   return (
-    <div className="relative mx-auto overflow-hidden rounded-xl border border-slate-300 bg-white p-8 shadow-inner" style={{ maxWidth: PAPER_WIDTH_PX[customization.paperSize] }}>
+    <div
+      className="print-area relative mx-auto overflow-hidden rounded-xl border border-slate-300 bg-white p-8 shadow-inner"
+      style={{ maxWidth: PAPER_WIDTH_PX[customization.paperSize] }}
+    >
       {header.fields.watermark && header.watermarkText && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
           <span className="rotate-[-30deg] text-6xl font-black text-slate-200 opacity-40">{header.watermarkText}</span>
@@ -65,7 +72,7 @@ export default function QuestionPaperPreview({
       )}
 
       <div className="relative">
-        <Header header={header} textAlign={customization.textAlign} />
+        <Header header={header} textAlign={customization.textAlign} editable={customization.editingMode} onChange={onHeaderChange} />
 
         <div style={containerStyle}>
           {sections.map((section) => {
@@ -78,20 +85,20 @@ export default function QuestionPaperPreview({
 
             return (
               <div key={section.type} className="mb-4 break-inside-avoid-column">
-                <p className="mb-2 font-bold underline decoration-2 underline-offset-2">
+                <div className="mb-2 flex items-baseline justify-between gap-3 font-bold">
                   <Editable
                     editable={customization.editingMode}
                     value={title}
+                    className="underline decoration-2 underline-offset-2"
                     onSave={(v) => onSectionTextChange?.(section.type, { titleOverride: v })}
-                  />{" "}
-                  <span className="ml-3 no-underline">
-                    <Editable
-                      editable={customization.editingMode}
-                      value={marksLine}
-                      onSave={(v) => onSectionTextChange?.(section.type, { marksLineOverride: v })}
-                    />
-                  </span>
-                </p>
+                  />
+                  <Editable
+                    editable={customization.editingMode}
+                    value={marksLine}
+                    className="shrink-0"
+                    onSave={(v) => onSectionTextChange?.(section.type, { marksLineOverride: v })}
+                  />
+                </div>
 
                 {sectionQuestions.map((q, index) => (
                   <div
@@ -128,7 +135,17 @@ export default function QuestionPaperPreview({
                                 }}
                               />
                             </span>
-                            <span className="shrink-0">{toBanglaNumber(sub.marks)}</span>
+                            <Editable
+                              editable={customization.editingMode}
+                              value={toBanglaNumber(sub.marks)}
+                              className="shrink-0"
+                              onSave={(v) => {
+                                const marks = parseInt(fromBanglaDigits(v), 10);
+                                if (Number.isNaN(marks)) return;
+                                const subQuestions = (q.subQuestions ?? []).map((s, i) => (i === si ? { ...s, marks } : s));
+                                saveField(q.id, { subQuestions });
+                              }}
+                            />
                           </p>
                         ))}
                       </>
@@ -143,7 +160,15 @@ export default function QuestionPaperPreview({
                               onSave={(v) => saveField(q.id, { text: v })}
                             />
                           </span>
-                          <span className="shrink-0">{toBanglaNumber(q.marks)}</span>
+                          <Editable
+                            editable={customization.editingMode}
+                            value={toBanglaNumber(q.marks)}
+                            className="shrink-0"
+                            onSave={(v) => {
+                              const marks = parseInt(fromBanglaDigits(v), 10);
+                              if (!Number.isNaN(marks)) saveField(q.id, { marks });
+                            }}
+                          />
                         </p>
                         {q.imageUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -175,7 +200,15 @@ export default function QuestionPaperPreview({
                             onSave={(v) => saveField(q.id, { text: v })}
                           />
                         </span>
-                        <span className="shrink-0">{toBanglaNumber(q.marks)}</span>
+                        <Editable
+                          editable={customization.editingMode}
+                          value={toBanglaNumber(q.marks)}
+                          className="shrink-0"
+                          onSave={(v) => {
+                            const marks = parseInt(fromBanglaDigits(v), 10);
+                            if (!Number.isNaN(marks)) saveField(q.id, { marks });
+                          }}
+                        />
                       </p>
                     )}
                   </div>
@@ -185,27 +218,17 @@ export default function QuestionPaperPreview({
           })}
         </div>
 
-        {header.fields.footer && header.footerText && (
-          <p className="mt-4 text-center text-xs italic text-slate-500">{header.footerText}</p>
+        {(header.fields.footer && (header.footerText || customization.editingMode)) && (
+          <Editable
+            as="div"
+            editable={customization.editingMode}
+            value={header.footerText}
+            placeholder="ফুটার লেখা"
+            className="mt-4 text-center text-xs italic text-slate-500"
+            onSave={(v) => onHeaderChange?.({ footerText: v })}
+          />
         )}
       </div>
     </div>
-  );
-}
-
-function Editable({ editable, value, onSave }: { editable: boolean; value: string; onSave: (v: string) => void }) {
-  if (!editable) return <span>{value}</span>;
-  return (
-    <span
-      contentEditable
-      suppressContentEditableWarning
-      className="rounded bg-amber-50 px-1 outline-dashed outline-1 outline-amber-300"
-      onBlur={(e) => {
-        const text = e.currentTarget.textContent ?? "";
-        if (text !== value) onSave(text);
-      }}
-    >
-      {value}
-    </span>
   );
 }

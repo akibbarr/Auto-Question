@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import CascadeSelector, { type CascadeValue } from "@/components/CascadeSelector";
 import CreativeQuestionParser from "@/components/CreativeQuestionParser";
+import QuickAddQuestions from "@/components/QuickAddQuestions";
 import QuestionForm from "@/components/QuestionForm";
 import QuestionList from "@/components/QuestionList";
 import { apiGet } from "@/lib/api";
@@ -37,6 +38,7 @@ export default function QuestionsPage() {
   }, [loadQuestions]);
 
   const canAddQuestion = value.classId && value.subjectId && value.chapterId && value.type;
+  const canAddBase = value.classId && value.subjectId && value.chapterId;
 
   return (
     <main className="space-y-6">
@@ -45,6 +47,15 @@ export default function QuestionsPage() {
       <div className="card p-4">
         <CascadeSelector value={value} onChange={setValue} />
       </div>
+
+      {canAddBase && (
+        <QuickAddQuestions
+          classId={value.classId!}
+          subjectId={value.subjectId!}
+          chapterId={value.chapterId!}
+          onSaved={loadQuestions}
+        />
+      )}
 
       {canAddQuestion && value.type === "creative" && (
         <section className="card p-4">
@@ -73,9 +84,9 @@ export default function QuestionsPage() {
         </section>
       )}
 
-      {!canAddQuestion && (
+      {!canAddBase && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-          নতুন প্রশ্ন যোগ করতে ক্লাস, বিষয়, অধ্যায় ও ধরন — সবগুলো নির্বাচন করুন।
+          নতুন প্রশ্ন যোগ করতে ক্লাস, বিষয় ও অধ্যায় নির্বাচন করুন। (তারপর উপরের সুপার-ফাস্ট বক্সে পেস্ট করেই দ্রুত যোগ করতে পারবেন, অথবা নিচে ধরন বেছে ফর্ম দিয়েও করতে পারবেন।)
         </p>
       )}
 
